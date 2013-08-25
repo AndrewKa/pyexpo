@@ -42,7 +42,7 @@ def get_args2(function):
     """
     spec = inspect.getargspec(function)
     r_args = reversed(spec.args)
-    r_defaults = reversed(spec.defaults)
+    r_defaults = reversed(spec.defaults if not spec.defaults is None else [])
     args = []
     vals = []
     not_specified = object()
@@ -92,6 +92,7 @@ def build_parser(pkg_paths):
 
 if __name__ == '__main__':
     pkg_paths = ['./scripts',]
+    #pkg_paths = [r'C:\tools\Python27\Lib\bsddb',]
     parser = build_parser(pkg_paths)
     namespace = parser.parse_args()
     namespace.__call(namespace)
