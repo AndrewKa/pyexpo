@@ -1,10 +1,11 @@
 import os
 import pkgutil
 import inspect
-from collections import defaultdict, OrderedDict
+from itertools import izip_longest, izip
+from collections import defaultdict, OrderedDict, namedtuple
 from datastructures import DefaultOrderedDict
 
-from argparse import ArgumentParser
+import argparse
 
 # Some ideas:
 # * routing stuff can be externalized (like Django's urls.py)
@@ -25,50 +26,72 @@ def functions(pkg_name, modname):
     return inspect.getmembers(mod, inspect.isfunction)
 
 
-def get_callables_(packages):
+def get_callables_2(packages):
     pkg_modules = DefaultOrderedDict(OrderedDict)
     for imp, name, _ in pkgutil.iter_modules(packages):
         pkg_name = os.path.basename(imp.path)
-        pkg_modules[pkg_name][name] = [{'name': n, 'callable': f, 'arguments': get_args(f)}
+        pkg_modules[pkg_name][name] = [{'name': n, 'callable': f, 'arguments': get_args2(f)}
                                        for n, f in functions(pkg_name, name)]
     return pkg_modules
 
 
-def get_args(function):
+ArgValue = namedtuple('ArgValue', 'data is_default')
+def get_args2(function):
     """Return ordered dict of arguments, where key is name
     and value is list, filled with value if it's default.
     """
     spec = inspect.getargspec(function)
-    args = OrderedDict()
-    for i, arg in enumerate(spec.args):
-        z = i - len(spec.args)
-        if spec.defaults and len(spec.defaults) >= abs(z):
-            d = len(spec.args) - len(spec.defaults)
-            assert (i - d) >= 0, (i, d)
-            args[arg] = [spec.defaults[i - d]]
+    r_args = reversed(spec.args)
+    r_defaults = reversed(spec.defaults)
+    args = []
+    vals = []
+    not_specified = object()
+    for arg, default in izip_longest(r_args, r_defaults, fillvalue=not_specified):
+        args.append(arg)
+        vals.append(
+            ArgValue(default, not default is not_specified)
+        )
+    return OrderedDict(izip(reversed(args), reversed(vals)))
+
+
+def _build_func_parser(mod_subparsers, func):
+    f_name, f_arguments, f_callable = func['name'], func['arguments'], func['callable']
+    func_parser = mod_subparsers.add_parser(f_name)
+    # add arguments of function
+    for name, value in f_arguments.items():
+        if value.is_default:
+            func_parser.add_argument('--'+name, default=value.data, type=type(value.data))
         else:
-            args[arg] = []
-    return args
+            func_parser.add_argument(name)
+    # bind function with parser
+    def call(parsed_args):
+        args = []
+        kwargs = {}
+        for name, value in f_arguments.items():
+            if value.is_default:
+                kwargs[name] = getattr(parsed_args, name, value.data)
+            else:
+                args.append(getattr(parsed_args, name))
+        f_callable(*args, **kwargs)
+    func_parser.set_defaults(__call=call)
+    return func_parser
 
 
-def print_fun_args(pkg_paths):
-    sarg = lambda name, default: '{}={}'.format(name, default[0]) if len(default) else name
-    for pkg_name, modules in get_callables_(pkg_paths).iteritems():
+def build_parser(pkg_paths):
+    parser = argparse.ArgumentParser(description="Exposes any function from any "
+                "module in 'scripts' dir to command line")
+    subs = parser.add_subparsers()
+    for pkg_name, modules in get_callables_2(pkg_paths).iteritems():
         for mod_name, functions in modules.iteritems():
+            mod_parser = subs.add_parser(mod_name)
+            mod_subs = mod_parser.add_subparsers()
             for func in functions:
-                args = [sarg(n, d) for n, d in func['arguments'].items()]
-                print pkg_name, mod_name, func['name'], ','.join(args)
-
-
-def main():
-    parser = ArgumentParser(description="Exploses any function from any "
-            "module in 'scripts' dir to command line")
-    parser.add_argument('--module', dest='module')
-
-    pkg_paths = ['./scripts',]
-    #print_fun_arguments(pkg_paths)
-    print_fun_args(pkg_paths)
+                _build_func_parser(mod_subs, func)
+    return parser
 
 
 if __name__ == '__main__':
-    main()
+    pkg_paths = ['./scripts',]
+    parser = build_parser(pkg_paths)
+    namespace = parser.parse_args()
+    namespace.__call(namespace)
