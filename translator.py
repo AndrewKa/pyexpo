@@ -2,7 +2,11 @@ import os
 import pkgutil
 import inspect
 from itertools import izip_longest, izip
-from collections import defaultdict, OrderedDict, namedtuple
+from collections import defaultdict, namedtuple
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 from datastructures import DefaultOrderedDict
 
 import argparse
@@ -91,7 +95,8 @@ def build_parser(pkg_paths):
 
 
 if __name__ == '__main__':
-    pkg_paths = ['./scripts',]
+    pkg_path = os.path.join(os.path.dirname(__file__), './scripts')
+    pkg_paths = [pkg_path,]
     #pkg_paths = [r'C:\tools\Python27\Lib\bsddb',]
     parser = build_parser(pkg_paths)
     namespace = parser.parse_args()

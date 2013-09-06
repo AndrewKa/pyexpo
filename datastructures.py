@@ -1,4 +1,8 @@
-from collections import OrderedDict, Callable
+from collections import Callable
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 class DefaultOrderedDict(OrderedDict):
     def __init__(self, default_factory=None, *a, **kw):
