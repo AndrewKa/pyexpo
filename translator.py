@@ -1,4 +1,5 @@
 import os
+import sys
 import pkgutil
 import inspect
 from itertools import izip_longest, izip
@@ -25,6 +26,7 @@ import argparse
 
 def functions(pkg_name, modname):
     full_modname = '{0}.{1}'.format(pkg_name, modname)
+    #print sys.path
     pkg = __import__(full_modname)
     mod = getattr(pkg, modname)
     return inspect.getmembers(mod, inspect.isfunction)
@@ -34,6 +36,9 @@ def get_callables_2(packages):
     pkg_modules = DefaultOrderedDict(OrderedDict)
     for imp, name, _ in pkgutil.iter_modules(packages):
         pkg_name = os.path.basename(imp.path)
+        pkg_parent = os.path.dirname(imp.path)
+        if pkg_parent not in sys.path:
+            sys.path.insert(0, pkg_parent)
         pkg_modules[pkg_name][name] = [{'name': n, 'callable': f, 'arguments': get_args2(f)}
                                        for n, f in functions(pkg_name, name)]
     return pkg_modules
@@ -67,7 +72,7 @@ def _build_func_parser(mod_subparsers, func):
             func_parser.add_argument('--'+name, default=value.data, type=type(value.data))
         else:
             func_parser.add_argument(name)
-    # bind function with parser
+    # define function and pass it to parser
     def call(parsed_args):
         args = []
         kwargs = {}
