@@ -18,12 +18,16 @@ except ImportError:
 # * I can call class constructors and further operate on returned
 #   object - just show methods of it!
 # * Actually each returned value can be inspected if it wasn't None.
+#   (as a kind of namespace)
 # * So, in abstract manner I can state this:
 #   * On any step I can get list of namespace/action
 #   * If something is namespace then I can explore names of it
 #   * If something is action then I can run it and it doesn't have children
 #   * Python's module/package/object is a namespace,
-#     and function is an action.
+#     and function is an action (but can be namespace also!).
+# * I can specify --print-result and send to stdout returned from function
+#   object's __str__ or __repr__
+# * --explore-result command will continue to expose object's namespace
 
 
 class LoadError(ImportError):
