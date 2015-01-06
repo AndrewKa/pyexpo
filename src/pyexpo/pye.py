@@ -16,14 +16,10 @@ except ImportError:
             pass
 
 
-#expo_location = '~/projects/py'
-#current_dir = os.path.dirname(os.path.abspath(__file__))
-#sys.path.insert(0, os.path.expanduser(expo_location))
-#sys.path.insert(0, os.path.dirname(current_dir))
 
 def get_settings():
-    settings_path = os.path.expanduser('~/.pyexpo')
-    cfgparser = cp.ConfigParser()
+    settings_path = os.path.join(os.path.expanduser('~/.pyexpo'), 'config.ini')
+    cfgparser = cp.ConfigParser({'errors': False})
     cfgparser.read([settings_path])
     def get_list(key, sep=os.path.pathsep):
         try:
@@ -33,10 +29,11 @@ def get_settings():
         except cp.NoOptionError as exc:
             #logger.warn("Cannot parse settings file: %s", exc)
             return None
-    return {'paths': get_list('paths'),
-            'exclude': get_list('exclude'),
-            'include': get_list('include'),
-            'errors': True}
+    settings = {'path': get_list('paths'),
+                'exclude': get_list('exclude'),
+                'include': get_list('include'),
+                'errors': cfgparser.get('DEFAULT', 'errors'),}
+    return settings
 
 
 def main():

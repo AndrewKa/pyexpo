@@ -3,44 +3,21 @@ import pkgutil
 import importlib
 import inspect
 from itertools import izip_longest, izip
-from collections import namedtuple
-try:
-    from collections import OrderedDict
-except ImportError:
-    from .ordereddict import OrderedDict
-
-
-#useful links:
-#http://www.python.org/dev/peps/pep-0302/
-#http://stackoverflow.com/questions/6943208/activate-a-virtualenv-with-a-python-script
-
-# something to consider:
-# * I can call class constructors and further operate on returned
-#   object - just show methods of it!
-# * Actually each returned value can be inspected if it wasn't None.
-#   (as a kind of namespace)
-# * So, in abstract manner I can state this:
-#   * On any step I can get list of namespace/action
-#   * If something is namespace then I can explore names of it
-#   * If something is action then I can run it and it doesn't have children
-#   * Python's module/package/object is a namespace,
-#     and function is an action (but can be namespace also!).
-# * I can specify --print-result and send to stdout returned from function
-#   object's __str__ or __repr__
-# * --explore-result command will continue to expose object's namespace
+from collections import namedtuple, OrderedDict
 
 
 class LoadError(ImportError):
     def __init__(self, msg, item):
         self._item = item
+        super(LoadError, self).__init__(msg)
 
 
 class Collector(object):
-    def __init__(self, include=None, exclude=None, errors=False, paths=None):
+    def __init__(self, include=None, exclude=None, errors=False, path=None):
         self._include = include or []
         self._exclude = exclude or []
         self._errors = [] if errors else None
-        self._paths = paths
+        self._path = path
 
     def _is_valid(self, load_info, parent=None):
         loader, name, ispkg = load_info
@@ -52,9 +29,9 @@ class Collector(object):
             valid = full_name in self._include
         return valid
 
-    def iter_items(self, paths=None, parent=None):
-        _paths = paths if paths is not None else self._paths
-        for info in pkgutil.iter_modules(path=_paths):
+    def iter_items(self, path=None, parent=None):
+        _path = path if path is not None else self._path
+        for info in pkgutil.iter_modules(path=_path):
             try:
                 if self._is_valid(info, parent=parent):
                     Namespace = PyPkg if info[2] else PyMod
@@ -118,6 +95,9 @@ class PyItem(object):
 
 
 class PyNamespace(PyItem):
+    # Is it better to use object.__dict__ directly? (for instances, classes,
+    # modules)
+    # Use getattr with keys of __dict__ due to __slots__!
     @property
     def children(self):
         if self._children is None:
@@ -171,10 +151,6 @@ class PyMod(PyNamespace):
 
 ArgValue = namedtuple('ArgValue', 'data is_default')
 class PyAction(PyItem):
-    #def __init__(self, name, parent=None):
-    #    self.name = name
-    #    self._parent = parent
-    #    self._children = None
     def __init__(self, name, instance=None, parent=None):
         super(PyAction, self).__init__(name, instance=instance, parent=parent)
         self._action_args = self._extract_args()
@@ -200,12 +176,12 @@ class PyAction(PyItem):
         return "Action: " + self.full_name
 
 
-def ensure_in_sys_path(paths):
-    for path in reversed(paths):
-        if path not in sys.path:
-            sys.path.insert(0, path)
+def ensure_in_sys_path(path):
+    for p in reversed(path):
+        if p not in sys.path:
+            sys.path.insert(0, p)
 
 def pyitems(**config):
-    if config.get('paths'):
-        ensure_in_sys_path(config['paths'])
+    if config.get('path'):
+        ensure_in_sys_path(config['path'])
     return Collector(**config).iter_items()
