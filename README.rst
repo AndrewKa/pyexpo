@@ -56,6 +56,9 @@ Ideas (may be implemented or not)
 
 .. _specified virtualenv: http://stackoverflow.com/questions/6943208/activate-a-virtualenv-with-a-python-script
 
+- use sphinx markup from docstrings for documentation
+
+- make simple scripts with smth like: pyexpo.functions_to_cli(func1, func2, ...)
 
 
 Design principles
