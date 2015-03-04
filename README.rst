@@ -51,6 +51,8 @@ Ideas (may be implemented or not)
   or more complicated manipulations (is it possible with std argparse?):
 
   * ``--x-next-name_of_param_in_next_action_or_num_of_position``
+  
+  or make it work like stack! (explore Forth, please!)
 
 - let's make it possible to run in `specified virtualenv`_
 
@@ -60,17 +62,58 @@ Ideas (may be implemented or not)
 
 - make simple scripts with smth like: pyexpo.functions_to_cli(func1, func2, ...)
 
+- expose via web, as shovel_
+
+.. _shovel: https://github.com/seomoz/shovel
+
+- start with smth simple: search path location: show packages/modules
+- Basically, there are different stuff:
+
+  * explore some point in fs for python packages/modules/callables
+  * converting exploration result into some form - ArgParser, currently
 
 Design principles
 -----------------
 - In any case it should be simple for main purpose - run any function via CLI
 - Should I use dotted notation for package namespaces? It should have natural flavour for python developer.
+- One dotted piece of string - one parser. It should be possible
 
 
 UX
 --
 - It should be easy for deployment (pip/rpm/deb/msi)
 - It should be easy for usage (autocomplete, fast, simple)
+
+
+Technical Details
+-----------------
+Code::
+
+    for importer, name, is_pkg in pkgutil.iter_modules(path=_paths):
+        try:
+            if self._is_needed(name, parent=parent):
+                N = Package if is_pkg else Module
+                yield N(name, parent=parent, collector=self)
+        except LoadError as exc:
+
+Another code::
+
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+More::
+
+    functions = inspect.getmembers(self.instance, inspect.isfunction)
+    actions = [Action(name, instance=instance, parent=self)
+               for name, instance in functions]
+
+And more::
+
+    def explore_paths(paths):
+        for importer, name, is_pkg in pkgutil.iter_modules(path=paths):
+            yield name
+
+what's about class browser?
 
 
 Useful links

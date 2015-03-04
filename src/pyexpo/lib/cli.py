@@ -1,16 +1,25 @@
 import os
 import argparse
-from pyitems import pyitems, PyNamespace, PyAction
+from pyitems import pyitems, Namespace, Action, LoadError
 
 
 def render_to_cli(pyi, subparsers):
+    #TODO: let's try to make it lazy: argparse.ArgumentParser.parse_known_args() + subparsers
     parser = subparsers.add_parser(pyi.name)
-    if isinstance(pyi, PyNamespace):
+    if isinstance(pyi, Namespace):
         ssp = parser.add_subparsers()
         for si in pyi.children:
-            render_to_cli(si, ssp)
+            try:
+                render_to_cli(si, ssp)
+            except LoadError as exc:
+                msg = "Cannot dive into {}: {}".format(si.full_name, exc)
+                print msg
+                if pyi.collector._errors is None:
+                    raise
+                else:
+                    pyi.collector._errors.append(exc._item)
     else:
-        assert isinstance(pyi, PyAction)
+        assert isinstance(pyi, Action)
 
         # add arguments of function to parser
         for name, value in pyi._action_args.items():
@@ -38,6 +47,7 @@ def build_parser(**config):
     #                    help='Paths to explore for python functions')
     subs = parser.add_subparsers()
     root_items = []
+    #iterate by PySearchPath(???not implemented) items or all top-level modules on sys.path
     for i in pyitems(**config):
         render_to_cli(i, subs)
         root_items.append(i)
@@ -45,6 +55,7 @@ def build_parser(**config):
     if config.get('errors'):
         error_items = set()
         for i in root_items:
+            print "Some errors ({}) have happened".format(len(i.collector._errors))
             if i.collector._errors:
                 for error_i in i.collector._errors:
                     error_items.add(str(error_i))

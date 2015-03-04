@@ -29,7 +29,7 @@ def get_settings():
         except cp.NoOptionError as exc:
             #logger.warn("Cannot parse settings file: %s", exc)
             return None
-    settings = {'path': get_list('paths'),
+    settings = {'paths': get_list('paths'),
                 'exclude': get_list('exclude'),
                 'include': get_list('include'),
                 'errors': cfgparser.get('DEFAULT', 'errors'),}
