@@ -2,8 +2,13 @@ import pkgutil
 import inspect
 import sys
 import importlib
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
+import itertools
+import runpy
 #pyclbr?
+
+
+#TODO: put class decorator for debug print...
 
 
 class NoChildFound(Exception):
@@ -15,7 +20,7 @@ class PySpaceObject(object):
     # it makes sense to convert these class-level fields to properties
     # and incorporate logging to them
 
-    callable = False
+    callable = True
 
     """Return tuples of args/kwargs. In case of args
     tuple is one-element
@@ -25,6 +30,9 @@ class PySpaceObject(object):
     description = ''
 
     children = ()
+
+    def call(self, *args, **kwargs):
+        pass
 
     def __init__(self, **kwargs):
         prohibited_attrs = {k for k in self.__dict__.keys()
@@ -78,7 +86,7 @@ class ModuleBase(PySpaceObject):
                 return new_value(data)
 
         for t, v in data['items'].iteritems():
-            if t == type_:
+            if t == type_ or issubclass(t, type_):
                 return v
         else:
             if default is NoChildFound:
@@ -92,28 +100,31 @@ class ModuleBase(PySpaceObject):
         if hasattr(self, '_child_stuff'):
             return self._child_stuff
 
+        self._child_stuff = OrderedDict()
         if hasattr(self.instance, '__path__'):
             iter_paths = pkgutil.iter_modules(self.instance.__path__)
-            # importer is the same for all children
-            self._child_stuff = OrderedDict(
-                (name, self._new_child_data())
-                for importer, name, is_pkg in iter_paths
-            )
-        else:
-            self._child_stuff = {}
+            # NOTE: importer is the same for all children
+            for importer, name, is_pkg in iter_paths:
+                self._child_stuff[name] = data = self._new_child_data()
+                Cls = Package if is_pkg else Module
+                data['items'][Cls] = Cls(name=self._full_child_name(name))
 
         self._set_actions()
 
-        return self._child_stuff
-
     @staticmethod
-    def create_module_object(name):
+    def _create_mod_instance(name):
         try:
-            instance = importlib.import_module(name)
-        except Exception as exc:
+            return importlib.import_module(name)
+        except ImportError as exc:
             print "Loading %s error:" % name, exc
             #TODO: introduce misc error-processing (replace, ignore, raise)
             #I can return here or later PySpaceObject with err description
+            return
+
+    @classmethod
+    def create_module_or_package(cls, name):
+        instance = cls._create_mod_instance(name)
+        if not instance:
             return
 
         is_pkg = hasattr(instance, '__path__')
@@ -122,22 +133,15 @@ class ModuleBase(PySpaceObject):
 
     def _full_child_name(self, name):
         return '{}.{}'.format(self.name, name)
-    
+
     @property
-    def callable(self):
-        self._set_child_stuff()
-        try:
-            m = self._child_of_type(
-                '__main__',
-                Module,
-                default=self._lazy_module_default('__main__')
-            )
-            return bool(m)
-        except NoChildFound:
-            return False
+    def instance(self):
+        if not hasattr(self, '_instance'):
+            self._instance = self._create_mod_instance(self.name)
+        return self._instance
 
     def _lazy_module_default(self, name):
-        return lambda: self.create_module_object(
+        return lambda: self.create_module_or_package(
             self._full_child_name(name)
         )
 
@@ -149,16 +153,19 @@ class ModuleBase(PySpaceObject):
         self._set_child_stuff()
         #Is generic inspect.getmembers(self.instance) better suited here?
         for name in self._child_stuff:
-            #if not self.is_special(name):
-            m = self._child_of_type(
-                name,
-                ModuleBase,
-                default=self._lazy_module_default(name))
-            if m:
-                yield m
-            a = self._child_of_type(name, Action, default=None)
-            if a:
-                yield a
+            try:
+                #if not self.is_special(name):
+                yield self._child_of_type(
+                    name,
+                    ModuleBase
+                )
+            except NoChildFound:
+                pass
+
+            try:
+                yield self._child_of_type(name, Action)
+            except NoChildFound:
+                pass
 
     def _set_actions(self):
         if hasattr(self, '_action_traversed'):
@@ -177,37 +184,97 @@ class ModuleBase(PySpaceObject):
         self._set_child_stuff()
         if name in self._child_stuff:
 
-            m = self._child_of_type(
-                name,
-                ModuleBase,
-                default=self._lazy_module_default(name))
-            if m:
-                return m
+            try:
+                return self._child_of_type(name, ModuleBase)
+            except NoChildFound:
+                pass
 
-            a = self._child_of_type(name, Action, default=None)
-            if a:
-                return a
+            return self._child_of_type(name, Action)
 
         return super(ModuleBase, self).__getitem__(name)
 
+    def call(self, *args, **kwargs):
+        #
+        #NOTE: File can be loaded twice!
+        #TODO: prevent second load! Use already loaded file!
+        #
+
+        # alternative:
+        #path = inspect.getsourcefile(self.instance)
+        #context = {'__name__': '__main__'}
+        #execfile(path, context)
+
+        runpy.run_module(self.name, run_name='__main__')
+        # explore internals of https://docs.python.org/2/library/runpy.html
+
 
 class Module(ModuleBase):
-    pass
+    HAS_PATHS = False
 
 
 class Package(ModuleBase):
-    pass
+    HAS_PATHS = True
+    
+    @property
+    def callable(self):
+        self._set_child_stuff()
+        try:
+            m = self._child_of_type(
+                '__main__',
+                Module
+            )
+            return bool(m)
+        except NoChildFound:
+            return False
+
+
+class ActionArguments(object):
+    """Thin wrapper on ArgSpec.
+    ArgSpec reminder:
+    # foo = lambda a, b, k1=1, k2=2, *args, **kwargs: None
+    # inspect.getargspec(foo) #=>
+    # ArgSpec(args=['a', 'b', 'k1', 'k2'],
+    #         varargs='args',
+    #         keywords='kwargs',
+    #         defaults=(1, 2))
+    """
+    def __init__(self, func):
+        self._as = inspect.getargspec(func)
+
+    @property
+    def args(self):
+        if self._as.defaults is None:
+            return self._as.args
+        else:
+            return self._as.args[:-len(self._as.defaults)]
+
+    @property
+    def kwargs(self):
+        if self._as.defaults is None:
+            return tuple()
+        else:
+            return tuple(itertools.izip(
+                self._as.args[-len(self._as.defaults):],
+                self._as.defaults
+            ))
+
+    @property
+    def args_name(self):
+        return self._as.varargs
+
+    @property
+    def kwargs_name(self):
+        return self._as.keywords
 
 
 class Action(PySpaceObject):
-    pass
 
+    @property
+    def arguments(self):
+        return ActionArguments(self.instance)
 
-def explore_paths(paths):
-    paths_to_sys(paths)
-    for importer, name, is_pkg in pkgutil.iter_modules(path=paths):
-        yield ModuleBase.create_module_object(name)
-        #yield Package(name=name) if is_pkg else Module(name=name)
+    def call(self, *args, **kwargs):
+        return self.instance(*args, **kwargs)
 
 
 def paths_to_sys(paths):
@@ -227,5 +294,29 @@ class PySpace(object):
 
     def __getitem__(self, name):
         #cache?
-        return ModuleBase.create_module_object(name)
+        return ModuleBase.create_module_or_package(name)
+
+    def __iter__(self):
+        for imp, name, is_pkg in pkgutil.iter_modules(path=self._only):
+            yield ModuleBase.create_module_or_package(name=name)
+
+
+def explore_paths(paths):
+    return PySpace(only_paths=paths)
+
+
+import os
+class abs_dir(object):
+    def __init__(self, path):
+        abspath = path
+        if not os.path.isabs(path):
+            abspath = os.path.abspath(path)
+        if not os.path.isabs(abspath):
+            raise ValueError("expected abs path, but got '%s'" % abspath)
+        if os.path.isdir(abspath):
+            self.parent = abspath
+        else:
+            self.parent = os.path.dirname(abspath)
+    def __div__(self, relpath):
+        return os.path.join(self.parent, relpath)
 

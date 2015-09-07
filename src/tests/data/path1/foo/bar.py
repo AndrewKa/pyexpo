@@ -19,3 +19,8 @@ def F2():
 
 class F2(object):
     pass
+
+
+print 'Loading bar'
+if __name__ == '__main__':
+    print 'Running bar'

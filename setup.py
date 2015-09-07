@@ -34,6 +34,6 @@ setup(name='pyexpo',
     install_requires=install_requires,
     entry_points={
         'console_scripts':
-            ['pye=pyexpo.pye:main']
+            ['pye=pyexpo.pye:pyspace']
     }
 )

@@ -1,3 +1,3 @@
-
+print 'Loading __main__'
 if __name__ == "__main__":
-    print "You've running package's 'main'"
+    print "Running __main__"
