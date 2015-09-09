@@ -297,6 +297,7 @@ class PySpace(object):
         return ModuleBase.create_module_or_package(name)
 
     def __iter__(self):
+        #import pdb; pdb.set_trace()
         for imp, name, is_pkg in pkgutil.iter_modules(path=self._only):
             yield ModuleBase.create_module_or_package(name=name)
 

@@ -6,7 +6,7 @@ import click
 from pyexpo import PySpace, abs_dir, Action
 
 
-tdata_abspath = abs_dir(__file__) / 'tests/data'
+tdata_abspath = abs_dir(__file__) / '../tests/data'
 paths = [
     abs_dir(tdata_abspath) / 'path1',
     abs_dir(tdata_abspath) / 'path2',
