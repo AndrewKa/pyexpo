@@ -49,7 +49,11 @@ class ActionCLI(click.Command):
         super(ActionCLI, self).__init__(*args, **kwargs)
 
     def callback(self, *args, **kwargs):
-        return self._pyobject.call(*args, **kwargs)
+        click.echo(
+            self._pyobject.call(*args, **kwargs)
+        )
+        #TODO: make it optional
+        #return self._pyobject.call(*args, **kwargs)
 
 
 def get_settings():

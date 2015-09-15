@@ -1,6 +1,7 @@
 import pkgutil
 import inspect
 import sys
+import StringIO
 import importlib
 from collections import OrderedDict, namedtuple
 import itertools
@@ -70,6 +71,12 @@ class PySpaceObject(object):
 
 class ModuleBase(PySpaceObject):
 
+    def __init__(self, **kwargs):
+        self._mute = True
+        self._out = StringIO.StringIO()
+        self._err = StringIO.StringIO()
+        super(ModuleBase, self).__init__(**kwargs)
+
     @staticmethod
     def _new_child_data():
         return {'items': OrderedDict()}
@@ -115,25 +122,19 @@ class ModuleBase(PySpaceObject):
 
         self._set_actions()
 
-    @staticmethod
-    def _create_mod_instance(name):
+    def _create_mod_instance(self):
+        stdout, stderr = sys.stdout, sys.stderr
+        if self._mute:
+            sys.stdout, sys.stderr = self._out, self._err
         try:
-            return importlib.import_module(name)
+            return importlib.import_module(self.name)
         except ImportError as exc:
-            print "Loading %s error:" % name, exc
+            print "Loading %s error:" % self.name, exc
             #TODO: introduce misc error-processing (replace, ignore, raise)
             #I can return here or later PySpaceObject with err description
             return
-
-    @classmethod
-    def create_module_or_package(cls, name):
-        instance = cls._create_mod_instance(name)
-        if not instance:
-            return
-
-        is_pkg = hasattr(instance, '__path__')
-        Cls = Package if is_pkg else Module
-        return Cls(instance=instance, name=name)
+        finally:
+            sys.stdout, sys.stderr = stdout, stderr
 
     def _full_child_name(self, name):
         return '{}.{}'.format(self.name, name)
@@ -141,7 +142,7 @@ class ModuleBase(PySpaceObject):
     @property
     def instance(self):
         if not hasattr(self, '_instance'):
-            self._instance = self._create_mod_instance(self.name)
+            self._instance = self._create_mod_instance()
         return self._instance
 
     @property
@@ -157,13 +158,6 @@ class ModuleBase(PySpaceObject):
                     yield self._child_of_type(name, t)
                 except NoChildFound:
                     pass
-
-    #def __iter__(self):
-    #    #import pdb; pdb.set_trace()
-    #    for imp, name, is_pkg in pkgutil.iter_modules(path=self._only):
-    #        module = ModuleBase.create_module_or_package(name=name)
-    #        if module:
-    #            yield module
 
     def _set_actions(self):
         if hasattr(self, '_action_traversed'):

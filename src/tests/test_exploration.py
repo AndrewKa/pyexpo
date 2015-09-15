@@ -42,6 +42,18 @@ def test__package_children():
     assert expected == submodule_names
 
 
+def test__is_package_callable():
+    space = PySpace(only_paths=PATHS)
+    foo = space['foo']
+    assert foo.callable
+
+
+def test__is_package_not_callable():
+    space = PySpace(only_paths=PATHS)
+    foo = space['pkg_bar']
+    assert not foo.callable
+
+
 def test__dictlike_package_access():
     space = PySpace(only_paths=[PATH1])
     assert space['foo']['subfoo'].name == 'foo.subfoo'
