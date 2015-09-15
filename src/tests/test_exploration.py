@@ -1,12 +1,12 @@
-from nose.tools import *
 from pyexpo import explore_paths, PySpace, Package
+from pyexpo.utils import abs_dir
 import os
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+DATA_DIR = abs_dir(__file__) / 'data'
 
-PATH1 = os.path.join(DATA_DIR, 'path1')
-PATH2 = os.path.join(DATA_DIR, 'path2')
-PATH_BASIC = os.path.join(DATA_DIR, 'basic')
+PATH1      = abs_dir(DATA_DIR) / 'path1'
+PATH2      = abs_dir(DATA_DIR) / 'path2'
+PATH_BASIC = abs_dir(DATA_DIR) / 'basic'
 
 PATHS = (PATH1, PATH2, PATH_BASIC)
 
@@ -78,4 +78,8 @@ def test__module_call(capsys):
     assert out == 'Loading bar\nRunning bar\n' 
 
 
-#: set autocmd BufWritePost * !nosetests
+#def test__process_load_error():
+#    def on_error(exc, object_name, 
+#    space = PySpace(only_paths=[PATH2], on_error=)
+
+#: set autocmd BufWritePost * !py.test

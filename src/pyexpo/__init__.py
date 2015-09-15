@@ -35,13 +35,13 @@ class PySpaceObject(object):
         pass
 
     def __init__(self, **kwargs):
-        prohibited_attrs = {k for k in self.__dict__.keys()
+        prohibited_attrs = {k for k in self.__dict__
                             if not k.startswith('_')}
         error_attrs = prohibited_attrs & set(kwargs)
         if error_attrs:
             raise ValueError("Cannot override in init these attrs: %s" % error_attrs)
 
-        error_args = {k for k in kwargs.keys()
+        error_args = {k for k in kwargs
                       if k.startswith('_')}
         if error_args:
             raise ValueError("Cannot introduce non-public attrs: %s" % error_args)
@@ -58,13 +58,17 @@ class PySpaceObject(object):
         return "<pyexpo.%s '%s' at 0x%x>" % (type(self).__name__, self.name, id(self))
 
 
+#class ErrorProcessor(object):
+#    REPLACE = 'replace'
+#    IGNORE = 'ignore'
+#    RAISE = 'raise'
+#    def pass():
+#        pass
+#        #TODO: introduce misc error-processing (replace, ignore, raise)
+#        #I can return here or later PySpaceObject with err description
+
+
 class ModuleBase(PySpaceObject):
-
-    SPECIAL = {'__init__', '__main__'}
-
-    @classmethod
-    def is_special(cls, name):
-        return name in cls.SPECIAL
 
     @staticmethod
     def _new_child_data():
@@ -140,11 +144,6 @@ class ModuleBase(PySpaceObject):
             self._instance = self._create_mod_instance(self.name)
         return self._instance
 
-    def _lazy_module_default(self, name):
-        return lambda: self.create_module_or_package(
-            self._full_child_name(name)
-        )
-
     @property
     def children(self):
         """Precedence in odinary child-query will be given to modules
@@ -153,19 +152,18 @@ class ModuleBase(PySpaceObject):
         self._set_child_stuff()
         #Is generic inspect.getmembers(self.instance) better suited here?
         for name in self._child_stuff:
-            try:
-                #if not self.is_special(name):
-                yield self._child_of_type(
-                    name,
-                    ModuleBase
-                )
-            except NoChildFound:
-                pass
+            for t in (ModuleBase, Action):
+                try:
+                    yield self._child_of_type(name, t)
+                except NoChildFound:
+                    pass
 
-            try:
-                yield self._child_of_type(name, Action)
-            except NoChildFound:
-                pass
+    #def __iter__(self):
+    #    #import pdb; pdb.set_trace()
+    #    for imp, name, is_pkg in pkgutil.iter_modules(path=self._only):
+    #        module = ModuleBase.create_module_or_package(name=name)
+    #        if module:
+    #            yield module
 
     def _set_actions(self):
         if hasattr(self, '_action_traversed'):
@@ -187,9 +185,7 @@ class ModuleBase(PySpaceObject):
             try:
                 return self._child_of_type(name, ModuleBase)
             except NoChildFound:
-                pass
-
-            return self._child_of_type(name, Action)
+                return self._child_of_type(name, Action)
 
         return super(ModuleBase, self).__getitem__(name)
 
@@ -283,41 +279,28 @@ def paths_to_sys(paths):
             sys.path.insert(0, path)
 
 
-class PySpace(object):
-    #https://www.python.org/dev/peps/pep-0252/
-    SKIP_SPECIAL = {'__members__', '__methods__'}
+class PySpaceInstance(object):
+    def __init__(self, paths):
+        self.__path__ = paths
+
+
+class PySpace(ModuleBase):
 
     def __init__(self, only_paths=None):
         self._only = only_paths
         if self._only:
             paths_to_sys(self._only)
+        self._instance = PySpaceInstance(paths=only_paths)
 
-    def __getitem__(self, name):
-        #cache?
-        return ModuleBase.create_module_or_package(name)
+    def _full_child_name(self, name):
+        return name
 
-    def __iter__(self):
-        #import pdb; pdb.set_trace()
-        for imp, name, is_pkg in pkgutil.iter_modules(path=self._only):
-            yield ModuleBase.create_module_or_package(name=name)
+    @property
+    def instance(self):
+        return self._instance
 
 
 def explore_paths(paths):
-    return PySpace(only_paths=paths)
+    return PySpace(only_paths=paths).children
 
-
-import os
-class abs_dir(object):
-    def __init__(self, path):
-        abspath = path
-        if not os.path.isabs(path):
-            abspath = os.path.abspath(path)
-        if not os.path.isabs(abspath):
-            raise ValueError("expected abs path, but got '%s'" % abspath)
-        if os.path.isdir(abspath):
-            self.parent = abspath
-        else:
-            self.parent = os.path.dirname(abspath)
-    def __div__(self, relpath):
-        return os.path.join(self.parent, relpath)
 

@@ -3,7 +3,8 @@
 import os
 import ConfigParser as cp
 import click
-from pyexpo import PySpace, abs_dir, Action
+from pyexpo import PySpace, Action
+from pyexpo.utils import abs_dir
 
 
 tdata_abspath = abs_dir(__file__) / '../tests/data'
@@ -12,20 +13,6 @@ paths = [
     abs_dir(tdata_abspath) / 'path2',
     abs_dir(tdata_abspath) / 'basic',
 ]
-
-
-class PySpaceCLI(click.MultiCommand):
-    def __init__(self, *args, **kwargs):
-        paths = kwargs.pop('paths', None)
-        self._pyspace = PySpace(only_paths=paths)
-        super(PySpaceCLI, self).__init__(*args, **kwargs)
-
-    def list_commands(self, ctx):
-        #short name?
-        return [so.name.split('.')[-1] for so in self._pyspace]
-
-    def get_command(self, ctx, name):
-        return ModuleCLI(pyobject=self._pyspace[name])
 
 
 class ModuleCLI(click.MultiCommand):
@@ -49,14 +36,14 @@ class ActionCLI(click.Command):
     def __init__(self, *args, **kwargs):
         self._pyobject = kwargs.pop('pyobject', None)
         params = []
+        for arg_name in self._pyobject.arguments.args:
+            params.append(click.Argument(param_decls=(arg_name,)))
         for arg_name, default in self._pyobject.arguments.kwargs:
             help = "Option '{}' with default value '{}'".format(arg_name, default)
             option = click.Option(param_decls=('--'+arg_name,),
                                   default=default,
                                   help=help)
             params.append(option)
-        for arg_name in self._pyobject.arguments.args:
-            params.append(click.Argument(arg_name))
         kwargs['params'] = params
         kwargs['callback'] = self.callback
         super(ActionCLI, self).__init__(*args, **kwargs)
@@ -83,7 +70,8 @@ def get_settings():
             'errors': cfgparser.get('DEFAULT', 'errors'),}
 
 
-pyspace = PySpaceCLI(paths=get_settings().get('paths'))
+paths = get_settings().get('paths')
+pyspace = ModuleCLI(pyobject=PySpace(only_paths=paths))
 
 
 if __name__ == '__main__':

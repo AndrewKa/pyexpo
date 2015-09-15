@@ -15,6 +15,10 @@ install_requires = [
     "Click==5.1",
 ]
 
+tests_require = [
+    "pytest",
+]
+
 
 setup(name='pyexpo',
     version=version,
@@ -33,6 +37,7 @@ setup(name='pyexpo',
     include_package_data=True,
     zip_safe=False,
     install_requires=install_requires,
+    tests_require=tests_require,
     entry_points={
         'console_scripts':
             ['pye=pyexpo.pye:pyspace']
