@@ -4,15 +4,6 @@ import os
 import ConfigParser as cp
 import click
 from pyexpo import PySpace, Action
-from pyexpo.utils import abs_dir
-
-
-tdata_abspath = abs_dir(__file__) / '../tests/data'
-paths = [
-    abs_dir(tdata_abspath) / 'path1',
-    abs_dir(tdata_abspath) / 'path2',
-    abs_dir(tdata_abspath) / 'basic',
-]
 
 
 class ModuleCLI(click.MultiCommand):

@@ -41,5 +41,6 @@ setup(name='pyexpo',
     entry_points={
         'console_scripts':
             ['pye=pyexpo.pye:pyspace']
+            #['pye=pyexpo.xpye:do']
     }
 )
