@@ -6,23 +6,6 @@ import click
 from pyexpo import PySpace, Action
 
 
-class ModuleCLI(click.MultiCommand):
-    #it's for Package also!
-    def __init__(self, *args, **kwargs):
-        self._pyobject = kwargs.pop('pyobject', None)
-        super(ModuleCLI, self).__init__(*args, **kwargs)
-
-    def list_commands(self, ctx):
-        return [so.name.split('.')[-1] for so in self._pyobject.children]
-
-    def get_command(self, ctx, name):
-        child = self._pyobject[name]
-        if isinstance(child, Action):
-            return ActionCLI(name, pyobject=child)
-        else:
-            return ModuleCLI(pyobject=child)
-
-
 class ActionCLI(click.Command):
     def __init__(self, *args, **kwargs):
         self._pyobject = kwargs.pop('pyobject', None)
@@ -47,9 +30,43 @@ class ActionCLI(click.Command):
         #return self._pyobject.call(*args, **kwargs)
 
 
+class ModuleCLI(click.MultiCommand):
+    # it's for Package also!
+    def __init__(self, *args, **kwargs):
+        self._pyobject = kwargs.pop('pyobject', None)
+        super(ModuleCLI, self).__init__(*args, **kwargs)
+
+    def list_commands(self, ctx):
+        return [so.name.split('.')[-1] for so in self._pyobject.children]
+
+    def get_command(self, ctx, name):
+        child = self._pyobject[name]
+        if isinstance(child, Action):
+            return ActionCLI(name, pyobject=child)
+        else:
+            return ModuleCLI(pyobject=child)
+
+    def _execute_as_agent(self, ctx, param, value):
+        click.echo('ctx={}, param={}, value={}'.format(ctx, param, value))
+        ctx.exit()
+
+    def get_params(self, ctx):
+        params = super(ModuleCLI, self).get_params(ctx)
+
+        params.append(click.Option(  # TODO: use click-specific file-type for this arg
+            param_decls=('--command-socket', ),
+            help='Specify this option if you want to run this app in agent mode (to communicate with primary instance)',
+            is_eager=True,
+            callback=self._execute_as_agent,
+            # expose_value=False,
+        ))
+
+        return params
+
+
 def get_settings():
     settings_path = os.path.join(os.path.expanduser('~/.pyexpo'), 'config.ini')
-    cfgparser = cp.ConfigParser({'errors': False})
+    cfgparser = cp.ConfigParser(defaults={'errors': False})
     cfgparser.read([settings_path])
     def get_list(key, sep=os.path.pathsep):
         try:
@@ -71,4 +88,3 @@ pyspace = ModuleCLI(pyobject=PySpace(only_paths=paths))
 
 if __name__ == '__main__':
     pyspace()
-

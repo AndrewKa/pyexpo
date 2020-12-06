@@ -8,6 +8,7 @@ import itertools
 import runpy
 #pyclbr?
 
+from .utils import send_at_9999
 
 #TODO: put class decorator for debug print...
 
@@ -268,7 +269,8 @@ class Action(PySpaceObject):
 
 
 def paths_to_sys(paths):
-    for path in paths:
+    for path in reversed(paths):
+        send_at_9999(path)
         if path not in sys.path:
             sys.path.insert(0, path)
 
