@@ -40,7 +40,6 @@ setup(
     tests_require=tests_require,
     entry_points={
         'console_scripts':
-            #['pye=pyexpo.pye:pyspace']
-            ['pye=pyexpo.xpye:do']
+            ['pye=pyexpo.pye:pyspace']
     }
 )

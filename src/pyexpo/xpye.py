@@ -182,7 +182,7 @@ def push_other_python(venv_root_or_python):
 
 
 def do():
-    is_foreign = (STD_PREFIX + 'pyexpo') in os.environ 
+    is_foreign = (STD_PREFIX + 'pyexpo') in os.environ
     if is_foreign:
         child_send('it is foreign, extracting...')
         extract_modules_from_env()
@@ -202,59 +202,6 @@ def do2():
     obj = next(steps)
     parent_send('I have got {}'.format(obj))
     next(steps, None)  # finalize
-
-
-# borrow some internals from click:
-
-def _get_complete_stuff(cli, prog_name):
-    from click.parser import split_arg_string
-    from click._bashcomplete import resolve_ctx
-    from click.core import MultiCommand, Option
-
-    # Do I need click as a kind of strange adapter here?
-    # It's better to get straightforward result from own machinery
-    # and pass it to click as one of UIs.
-    # But I need my own "vocabulary" for such case - it's my domain.
-    #
-    # TODO: I need cli interface in one place only. The other
-    # side - agent - should communicate with current cli by
-    # some specific protocol. That's all!
-    #
-    # I can use this same app as agent with cli option --control-url
-
-    cwords = split_arg_string(os.environ['COMP_WORDS'])
-    cword = int(os.environ['COMP_CWORD'])
-    args = cwords[1:cword]
-    try:
-        incomplete = cwords[cword]
-    except IndexError:
-        incomplete = ''
-
-    ctx = resolve_ctx(cli, prog_name, args)
-    if ctx is None:
-        return []
-
-    choices = []
-    if incomplete and not incomplete[:1].isalnum():
-        for param in ctx.command.params:
-            if not isinstance(param, Option):
-                continue
-            choices.extend(param.opts)
-            choices.extend(param.secondary_opts)
-    elif isinstance(ctx.command, MultiCommand):
-        choices.extend(ctx.command.list_commands(ctx))
-
-    return [item for item in choices if item.startswith(incomplete)]
-
-
-def _click_internals():
-    from click.utils import make_str
-    # from click._bashcomplete import do_complete
-    from pyexpo.pye import ModuleCLI, paths, PySpace
-    cli = ModuleCLI(pyobject=PySpace(only_paths=paths))
-    prog_name = make_str(os.path.basename(
-        sys.argv and sys.argv[0] or __file__))
-    return _get_complete_stuff(cli, prog_name)
 
 
 if __name__ == '__main__':
